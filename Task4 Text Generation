@@ -1,0 +1,39 @@
+from transformers import pipeline
+
+print("Loading GPT model...")
+
+generator = pipeline(
+    "text-generation",
+    model="gpt2"
+)
+
+def generate_text(prompt):
+
+    result = generator(
+        prompt,
+        max_length=150,
+        num_return_sequences=1,
+        temperature=0.8,
+        do_sample=True,
+        pad_token_id=50256
+    )
+
+    return result[0]["generated_text"]
+
+if __name__ == "__main__":
+
+    print("=" * 60)
+    print("GENERATIVE TEXT MODEL")
+    print("=" * 60)
+
+    prompt = input(
+        "\nEnter a topic or prompt: "
+    )
+
+    generated_text = generate_text(prompt)
+
+    print("\n" + "=" * 60)
+    print("GENERATED TEXT")
+    print("=" * 60)
+
+    print(generated_text)
