@@ -1,0 +1,107 @@
+import re
+import nltk
+from collections import Counter
+
+# Download required NLTK data
+nltk.download("punkt")
+nltk.download("stopwords")
+
+from nltk.corpus import stopwords
+from nltk.tokenize import sent_tokenize, word_tokenize
+
+
+def summarize_text(text, num_sentences=3):
+    """
+    Generate an extractive summary from the input text.
+    """
+
+    # Split article into sentences
+    sentences = sent_tokenize(text)
+
+    if len(sentences) <= num_sentences:
+        return text
+
+    # Stop words
+    stop_words = set(stopwords.words("english"))
+
+    # Clean and tokenize the complete article
+    words = word_tokenize(text.lower())
+
+    # Keep alphabetic words and remove stop words
+    filtered_words = [
+        word for word in words
+        if word.isalpha() and word not in stop_words
+    ]
+
+    # Calculate word frequency
+    word_frequency = Counter(filtered_words)
+
+    # Normalize frequencies
+    max_frequency = max(word_frequency.values())
+
+    for word in word_frequency:
+        word_frequency[word] /= max_frequency
+
+    # Score each sentence
+    sentence_scores = {}
+
+    for sentence in sentences:
+        words = word_tokenize(sentence.lower())
+
+        score = 0
+
+        for word in words:
+            if word in word_frequency:
+                score += word_frequency[word]
+
+        sentence_scores[sentence] = score
+
+    # Select highest-scoring sentences
+    ranked_sentences = sorted(
+        sentence_scores,
+        key=sentence_scores.get,
+        reverse=True
+    )
+
+    selected = ranked_sentences[:num_sentences]
+
+    # Keep original article order
+    summary = [
+        sentence for sentence in sentences
+        if sentence in selected
+    ]
+
+    return " ".join(summary)
+
+
+# -------------------------------
+# Main Program
+# -------------------------------
+
+if __name__ == "__main__":
+
+    article = """
+    Artificial Intelligence is becoming an important technology in modern society.
+    AI systems can process large amounts of information and identify useful patterns.
+    Machine learning allows computers to learn from data without being explicitly
+    programmed for every individual task. Natural language processing enables
+    computers to understand and process human language. AI is being used in
+    healthcare, education, transportation, cybersecurity, finance, and many other
+    industries. As AI technology develops, organizations need responsible and
+    reliable methods for designing and deploying intelligent systems.
+    """
+
+    print("=" * 60)
+    print("TEXT SUMMARIZATION TOOL")
+    print("=" * 60)
+
+    print("\nORIGINAL ARTICLE:\n")
+    print(article)
+
+    summary = summarize_text(article, num_sentences=3)
+
+    print("\n" + "=" * 60)
+    print("GENERATED SUMMARY")
+    print("=" * 60)
+
+    print(summary)
