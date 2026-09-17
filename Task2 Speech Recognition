@@ -1,0 +1,45 @@
+import speech_recognition as sr
+
+
+def speech_to_text(audio_file):
+    """
+    Convert a WAV audio file into text.
+    """
+
+    recognizer = sr.Recognizer()
+
+    try:
+        # Load audio file
+        with sr.AudioFile(audio_file) as source:
+
+            print("Reading audio file...")
+            audio = recognizer.record(source)
+
+        print("Recognizing speech...")
+
+        # Google Speech Recognition
+        text = recognizer.recognize_google(audio)
+
+        return text
+
+    except sr.UnknownValueError:
+        return "Sorry, the speech could not be understood."
+
+    except sr.RequestError:
+        return "Speech recognition service is unavailable."
+
+    except FileNotFoundError:
+        return "Audio file not found."
+
+if __name__ == "__main__":
+
+    audio_file = "sample.wav"
+
+    print("=" * 60)
+    print("SPEECH-TO-TEXT SYSTEM")
+    print("=" * 60)
+
+    result = speech_to_text(audio_file)
+
+    print("\nTRANSCRIPTION:")
+    print(result)
