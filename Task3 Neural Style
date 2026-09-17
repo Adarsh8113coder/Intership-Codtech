@@ -1,0 +1,192 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+from torchvision import models, transforms
+from PIL import Image
+import matplotlib.pyplot as plt
+
+device = torch.device(
+    "cuda" if torch.cuda.is_available() else "cpu"
+)
+
+print("Using device:", device)
+
+def load_image(path, max_size=400):
+
+    image = Image.open(path).convert("RGB")
+
+    size = max(image.size)
+
+    if size > max_size:
+        scale = max_size / size
+
+        new_size = (
+            int(image.size[0] * scale),
+            int(image.size[1] * scale)
+        )
+
+        image = image.resize(new_size)
+
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
+        )
+    ])
+
+    image = transform(image)
+
+    return image.unsqueeze(0).to(device)
+content = load_image("content.jpg")
+style = load_image("style.jpg")
+
+vgg = models.vgg19(
+    weights=models.VGG19_Weights.DEFAULT
+).features.to(device).eval()
+
+for parameter in vgg.parameters():
+    parameter.requires_grad = False
+layers = {
+    "0": "conv1_1",
+    "5": "conv2_1",
+    "10": "conv3_1",
+    "19": "conv4_1",
+    "21": "conv4_2",
+    "28": "conv5_1"
+}
+
+def get_features(image):
+
+    features = {}
+
+    x = image
+
+    for name, layer in vgg._modules.items():
+
+        x = layer(x)
+
+        if name in layers:
+            features[layers[name]] = x
+
+    return features
+
+
+content_features = get_features(content)
+style_features = get_features(style)
+def gram_matrix(tensor):
+
+    _, channels, height, width = tensor.size()
+
+    matrix = tensor.view(
+        channels,
+        height * width
+    )
+
+    gram = torch.mm(matrix, matrix.t())
+
+    return gram
+
+
+style_grams = {
+    layer: gram_matrix(feature)
+    for layer, feature in style_features.items()
+}
+
+
+generated = content.clone().requires_grad_(True)
+style_weights = {
+    "conv1_1": 1.0,
+    "conv2_1": 0.8,
+    "conv3_1": 0.5,
+    "conv4_1": 0.3,
+    "conv5_1": 0.2
+}
+
+content_weight = 1
+style_weight = 1e6
+
+optimizer = optim.Adam(
+    [generated],
+    lr=0.003
+)
+
+steps = 300
+
+for step in range(steps):
+
+    generated_features = get_features(generated)
+
+    # Content loss
+    content_loss = torch.mean(
+        (generated_features["conv4_2"]
+         - content_features["conv4_2"]) ** 2
+    )
+
+    # Style loss
+    style_loss = 0
+
+    for layer in style_weights:
+
+        generated_gram = gram_matrix(
+            generated_features[layer]
+        )
+
+        target_gram = style_grams[layer]
+
+        layer_loss = torch.mean(
+            (generated_gram - target_gram) ** 2
+        )
+
+        style_loss += (
+            style_weights[layer] * layer_loss
+        )
+
+    total_loss = (
+        content_weight * content_loss
+        + style_weight * style_loss
+    )
+
+    optimizer.zero_grad()
+
+    total_loss.backward()
+
+    optimizer.step()
+
+    if step % 50 == 0:
+
+        print(
+            f"Step {step}/{steps} "
+            f"Loss: {total_loss.item():.4f}"
+        )
+
+result = generated.detach().cpu().squeeze(0)
+
+result = result.permute(1, 2, 0)
+result = result * torch.tensor(
+    [0.229, 0.224, 0.225]
+)
+
+result = result + torch.tensor(
+    [0.485, 0.456, 0.406]
+)
+
+result = torch.clamp(result, 0, 1)
+
+plt.figure(figsize=(10, 8))
+
+plt.imshow(result)
+
+plt.axis("off")
+
+plt.title("Neural Style Transfer Result")
+
+plt.savefig(
+    "styled_output.jpg",
+    bbox_inches="tight"
+)
+
+plt.show()
+
+print("Styled image saved as styled_output.jpg")
